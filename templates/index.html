@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkers — Arthur Samuel AI</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #1a1a2e; color: #e0e0e0;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px; user-select: none;
+  }
+  h1 { font-size: 1.6em; margin-bottom: 4px; }
+  .subtitle { font-size: 0.85em; color: #888; margin-bottom: 16px; }
+  #status {
+    font-size: 1.1em; margin-bottom: 12px; min-height: 1.4em;
+    color: #ffd700; font-weight: 500;
+  }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(8, 64px);
+    grid-template-rows: repeat(8, 64px);
+    border: 3px solid #4a3728; border-radius: 4px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    position: relative;
+  }
+  .sq {
+    width: 64px; height: 64px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .light { background: #f0d9b5; }
+  .dark  { background: #b58863; }
+  .sq.highlight { background: #7fc97f; cursor: pointer; }
+  .sq.selected  { background: #5dade2; }
+  .sq.last-move { box-shadow: inset 0 0 0 3px rgba(255, 215, 0, 0.5); }
+  .sq.drop-over { background: #5dde5d; }
+
+  .pc {
+    width: 48px; height: 48px; border-radius: 50%;
+    position: relative;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+    transition: transform 0.1s;
+  }
+  .pc.can-move { cursor: grab; }
+  .pc.can-move:hover { transform: scale(1.08); }
+  .pc.ghost-src { opacity: 0.3; }
+
+  .pc.bm { background: radial-gradient(circle at 35% 35%, #555, #1a1a1a); border: 2px solid #333; }
+  .pc.bk { background: radial-gradient(circle at 35% 35%, #555, #1a1a1a); border: 2px solid #ffd700; }
+  .pc.wm { background: radial-gradient(circle at 35% 35%, #fff, #ccc); border: 2px solid #aaa; }
+  .pc.wk { background: radial-gradient(circle at 35% 35%, #fff, #ccc); border: 2px solid #ffd700; }
+
+  .crown {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 22px; pointer-events: none;
+  }
+  .bk .crown { color: #ffd700; }
+  .wk .crown { color: #b8860b; }
+
+  /* Floating piece that follows cursor */
+  #ghost {
+    position: fixed; pointer-events: none; z-index: 1000;
+    width: 52px; height: 52px; border-radius: 50%;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    transform: translate(-50%, -50%);
+    display: none;
+  }
+
+  .controls { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  button {
+    padding: 8px 20px; font-size: 0.95em; border: none; border-radius: 6px;
+    cursor: pointer; font-weight: 500; transition: background 0.2s, transform 0.1s;
+  }
+  button:hover  { transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+  #btn-new   { background: #2ecc71; color: #fff; }
+  #btn-train { background: #e67e22; color: #fff; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .info {
+    margin-top: 16px; text-align: center; font-size: 0.85em;
+    color: #888; max-width: 520px; line-height: 1.5;
+  }
+  .weights-display { margin-top: 12px; font-size: 0.8em; color: #666; max-width: 520px; text-align: center; }
+
+  .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid #ffd700; border-top-color: transparent;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .score-bar {
+    display: flex; justify-content: space-between; width: 515px;
+    margin-bottom: 8px; font-size: 0.9em;
+  }
+  .score-bar .black-score { color: #aaa; }
+  .score-bar .white-score { color: #fff; }
+</style>
+</head>
+<body>
+
+<h1>Checkers</h1>
+<p class="subtitle">Arthur Samuel-style AI (1959) — Minimax + TD Learning</p>
+
+<div class="score-bar">
+  <span class="black-score">&#9899; You (Black)</span>
+  <span class="white-score">&#9898; AI (White)</span>
+</div>
+<div id="status">Your turn</div>
+
+<div class="board" id="board"></div>
+<div id="ghost"></div>
+
+<div class="controls">
+  <button id="btn-new" onclick="newGame()">New Game</button>
+  <button id="btn-train" onclick="trainAI()">Train AI (500 games)</button>
+</div>
+
+<div class="info">
+  Drag a piece or click-then-click. Captures are mandatory. Train to make the AI stronger!
+</div>
+<div class="weights-display" id="weights-info"></div>
+
+<script>
+const PC = { 1:'bm', 2:'bk', '-1':'wm', '-2':'wk' };
+const AI_DELAY = 600;
+
+// Square mapping
+const sq2rc = {}, rc2sq = {};
+for (let s = 0; s < 32; s++) {
+  const r = s >> 2, c = 2 * (s & 3) + (r % 2 === 0 ? 1 : 0);
+  sq2rc[s] = [r, c];
+  rc2sq[r * 8 + c] = s;
+}
+
+let board = new Array(32).fill(0);
+let movesBySrc = {};
+let selected = null;
+let gameOver = false;
+let lastAI = null;
+let busy = false;
+
+// ── Drag state (mouse-based) ──
+let dragging = null;   // square index being dragged
+let dragDests = null;   // Set of valid destination squares
+const ghost = () => document.getElementById('ghost');
+
+function destsFor(sq) {
+  if (sq == null || !movesBySrc[sq]) return new Set();
+  return new Set(movesBySrc[sq].map(m => m[m.length - 1]));
+}
+
+// ── Fetch helpers ──
+
+async function loadState() {
+  const r = await fetch('/api/state');
+  return r.json();
+}
+
+async function loadMoves() {
+  const r = await fetch('/api/legal_moves');
+  const d = await r.json();
+  movesBySrc = {};
+  for (const m of d.moves) {
+    const s = m[0];
+    (movesBySrc[s] ??= []).push(m);
+  }
+}
+
+// ── Render ──
+
+function setStatus(html) { document.getElementById('status').innerHTML = html; }
+
+function render() {
+  const el = document.getElementById('board');
+  el.innerHTML = '';
+
+  const activeSq = selected ?? dragging;
+  const dests = destsFor(activeSq);
+  const aiSet = new Set(lastAI || []);
+
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const div = document.createElement('div');
+      const dark = (r + c) % 2 === 1;
+      div.className = 'sq ' + (dark ? 'dark' : 'light');
+
+      if (!dark) { el.appendChild(div); continue; }
+
+      const sq = rc2sq[r * 8 + c];
+      if (sq === undefined) { el.appendChild(div); continue; }
+
+      div.dataset.sq = sq;
+      if (sq === activeSq) div.classList.add('selected');
+      if (dests.has(sq)) div.classList.add('highlight');
+      if (aiSet.has(sq)) div.classList.add('last-move');
+
+      const p = board[sq];
+      if (p !== 0) {
+        const pd = document.createElement('div');
+        pd.className = 'pc ' + PC[p];
+        if (Math.abs(p) === 2) {
+          const cr = document.createElement('span');
+          cr.className = 'crown'; cr.textContent = '\u265B';
+          pd.appendChild(cr);
+        }
+        // Mark as draggable if it's the player's movable piece
+        const canMove = p > 0 && !busy && !gameOver && movesBySrc[sq];
+        if (canMove) pd.classList.add('can-move');
+        if (sq === dragging) pd.classList.add('ghost-src');
+        div.appendChild(pd);
+      }
+
+      el.appendChild(div);
+    }
+  }
+}
+
+// ── Mouse-based drag ──
+
+document.addEventListener('mousedown', (e) => {
+  if (busy || gameOver) return;
+
+  // Find if we clicked on a piece inside a square
+  const pcEl = e.target.closest('.pc.can-move');
+  if (!pcEl) return;
+  const sqEl = pcEl.closest('.sq');
+  if (!sqEl) return;
+
+  const sq = parseInt(sqEl.dataset.sq);
+  if (!movesBySrc[sq]) return;
+
+  e.preventDefault();
+  dragging = sq;
+  selected = null;
+  dragDests = destsFor(sq);
+
+  // Set up ghost
+  const g = ghost();
+  g.className = 'pc ' + PC[board[sq]];
+  g.style.display = 'block';
+  g.style.position = 'fixed';
+  g.style.pointerEvents = 'none';
+  g.style.zIndex = '1000';
+  g.style.width = '52px';
+  g.style.height = '52px';
+  g.style.borderRadius = '50%';
+  g.style.boxShadow = '0 8px 24px rgba(0,0,0,0.6)';
+  g.style.transform = 'translate(-50%, -50%)';
+  g.style.left = e.clientX + 'px';
+  g.style.top = e.clientY + 'px';
+  g.innerHTML = '';
+  if (Math.abs(board[sq]) === 2) {
+    const cr = document.createElement('span');
+    cr.className = 'crown'; cr.textContent = '\u265B';
+    g.appendChild(cr);
+  }
+
+  render();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (dragging === null) return;
+  const g = ghost();
+  g.style.left = e.clientX + 'px';
+  g.style.top = e.clientY + 'px';
+
+  // Highlight square under cursor
+  document.querySelectorAll('.sq.drop-over').forEach(el => el.classList.remove('drop-over'));
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  if (under) {
+    const sqEl = under.closest('.sq');
+    if (sqEl) {
+      const sq = parseInt(sqEl.dataset.sq);
+      if (dragDests && dragDests.has(sq)) sqEl.classList.add('drop-over');
+    }
+  }
+});
+
+document.addEventListener('mouseup', (e) => {
+  if (dragging === null) return;
+
+  ghost().style.display = 'none';
+  document.querySelectorAll('.sq.drop-over').forEach(el => el.classList.remove('drop-over'));
+
+  // Check if we dropped on a valid destination
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  let targetSq = null;
+  if (under) {
+    const sqEl = under.closest('.sq');
+    if (sqEl) targetSq = parseInt(sqEl.dataset.sq);
+  }
+
+  if (targetSq !== null && dragDests && dragDests.has(targetSq)) {
+    const move = movesBySrc[dragging].find(m => m[m.length - 1] === targetSq);
+    dragging = null;
+    dragDests = null;
+    if (move) { submitMove(move); return; }
+  }
+
+  // Cancelled drag — treat as click-select instead
+  const sq = dragging;
+  dragging = null;
+  dragDests = null;
+  selected = sq;
+  render();
+});
+
+// ── Click to move (on squares) ──
+
+document.getElementById('board').addEventListener('click', (e) => {
+  if (busy || gameOver || dragging !== null) return;
+
+  const sqEl = e.target.closest('.sq');
+  if (!sqEl) return;
+  const sq = parseInt(sqEl.dataset.sq);
+
+  const p = board[sq];
+
+  // Clicking a highlighted destination
+  if (selected !== null && movesBySrc[selected]) {
+    const move = movesBySrc[selected].find(m => m[m.length - 1] === sq);
+    if (move) { submitMove(move); return; }
+  }
+
+  // Clicking own piece
+  if (p > 0 && movesBySrc[sq]) {
+    selected = sq;
+    render();
+    return;
+  }
+
+  selected = null;
+  render();
+});
+
+// ── Move submission ──
+
+async function submitMove(move) {
+  busy = true;
+  selected = null;
+
+  const res = await fetch('/api/make_move', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ move })
+  });
+  const st = await res.json();
+  if (st.error) { setStatus('Error: ' + st.error); busy = false; return; }
+
+  board = st.board;
+  gameOver = st.is_over;
+  lastAI = null;
+  render();
+
+  if (gameOver) {
+    setStatus(st.result === 1 ? 'You win!' : st.result === -1 ? 'AI wins!' : 'Draw!');
+    busy = false;
+    return;
+  }
+
+  setStatus('<span class="spinner"></span>AI is thinking...');
+  await new Promise(r => setTimeout(r, AI_DELAY));
+
+  const ar = await fetch('/api/ai_move', { method: 'POST' });
+  const ad = await ar.json();
+  board = ad.state.board;
+  gameOver = ad.state.is_over;
+  lastAI = ad.ai_move;
+
+  if (gameOver) {
+    setStatus(ad.state.result === 1 ? 'You win!' : ad.state.result === -1 ? 'AI wins!' : 'Draw!');
+  } else {
+    setStatus('Your turn');
+    await loadMoves();
+  }
+  busy = false;
+  render();
+}
+
+// ── New game / training ──
+
+async function newGame() {
+  await fetch('/api/new_game', { method: 'POST' });
+  const st = await loadState();
+  board = st.board; gameOver = st.is_over;
+  selected = null; lastAI = null; busy = false;
+  setStatus('Your turn');
+  await loadMoves();
+  render();
+}
+
+async function trainAI() {
+  document.getElementById('btn-train').disabled = true;
+  setStatus('<span class="spinner"></span>Training (500 games)...');
+  try {
+    const r = await fetch('/api/train', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ num_games: 500, depth: 3 })
+    });
+    const d = await r.json();
+    const s = d.stats;
+    setStatus(`Done! B:${s.black_wins} W:${s.white_wins} D:${s.draws} — start a new game`);
+    const pairs = Object.entries(d.weights).map(([k,v]) => `${k}: ${v}`);
+    document.getElementById('weights-info').textContent = pairs.join(' | ');
+  } catch (e) { setStatus('Error: ' + e.message); }
+  document.getElementById('btn-train').disabled = false;
+}
+
+// ── Init ──
+(async () => {
+  const st = await loadState();
+  board = st.board; gameOver = st.is_over;
+  setStatus(st.turn === 1 ? 'Your turn' : 'AI thinking...');
+  await loadMoves();
+  render();
+})();
+</script>
+</body>
+</html>
