@@ -110,13 +110,47 @@ The AI also learned that kings are slightly more valuable than the naive 1.5x mu
 
 The draws in trained-vs-untrained come from color alternation — at depth 3, one color has a systematic advantage in certain lines. In all games where the trained AI doesn't draw, it wins.
 
+## Arena — Tournament System
+
+The arena pits different AI configurations against each other in round-robin matches with Elo ratings. This answers the key question: **does training actually produce a stronger player?**
+
+### Running a Tournament
+
+```bash
+python arena.py              # full tournament (trains 3 configs + 2 hand-crafted)
+python arena.py --quick      # fewer training games, faster results
+python arena.py --load arena_results.json  # display saved results
+```
+
+The default roster includes:
+- **Default** — hand-tuned starting weights
+- **Random** — no evaluation (baseline)
+- **Rookie** — TD(lambda) trained for 100 games
+- **Trained** — TD(lambda) trained for 300 games
+- **Veteran** — TD(lambda) trained for 500 games
+- **Aggressor** — hand-crafted weights that overvalue material
+- **Turtle** — hand-crafted weights that prioritize defense
+
+Each pair plays 20 games (10 per side) with Elo updates after each match.
+
+### Viewing Results
+
+Results are saved to `arena_results.json` and viewable:
+- **CLI**: `python arena.py --load arena_results.json`
+- **Web UI**: Click the "Arena" button in the game interface
+
+### What the Arena Reveals
+
+Training produces measurably stronger play. The Elo gap between trained and untrained configurations is significant and consistent across tournament runs. Hand-crafted extreme strategies (pure aggression, pure defense) perform worse than balanced learned weights — the TD(lambda) learner finds a better trade-off than any human-designed heuristic we tried.
+
 ## Architecture
 
 ```
 checkers.py    284 lines   Game engine, board, moves, rules
 ai.py          385 lines   Features, evaluator, minimax, training
-app.py         113 lines   Flask API server
-index.html     437 lines   Board UI (inline JS/CSS)
+arena.py       220 lines   Tournament engine with Elo ratings
+app.py         125 lines   Flask API server
+index.html     480 lines   Board UI + arena leaderboard
 weights.json    26 lines   Learned weights
 ```
 
@@ -129,6 +163,7 @@ weights.json    26 lines   Learned weights
 | `/api/legal_moves` | GET | Legal moves for current player |
 | `/api/make_move` | POST | Human moves, AI responds |
 | `/api/train` | POST | Run self-play training (blocking) |
+| `/api/arena/results` | GET | Latest tournament leaderboard |
 
 ## References
 

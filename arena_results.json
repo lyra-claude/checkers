@@ -1,0 +1,340 @@
+{
+  "players": [
+    {
+      "name": "Default",
+      "weights": [
+        1.0,
+        1.5,
+        0.3,
+        0.1,
+        0.3,
+        0.1,
+        0.05,
+        0.05,
+        0.15,
+        0.1
+      ],
+      "depth": 3,
+      "description": "Hand-tuned starting weights"
+    },
+    {
+      "name": "Random",
+      "weights": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "depth": 1,
+      "description": "Random play (no evaluation)"
+    },
+    {
+      "name": "Rookie (100g)",
+      "weights": [
+        1.055999920705725,
+        1.5308843136621686,
+        0.4754552063733331,
+        0.13054129178891444,
+        0.3262658652137916,
+        0.11002127900934842,
+        0.10733485882831667,
+        -0.005970590762020651,
+        0.1671794517379382,
+        0.11371865737489771
+      ],
+      "depth": 3,
+      "description": "TD(\u03bb) trained, 100 games, lr=0.003"
+    },
+    {
+      "name": "Trained (300g)",
+      "weights": [
+        1.1119549639906017,
+        1.5721030566320187,
+        0.7211931332057718,
+        0.18318458756580722,
+        0.3580399266419598,
+        0.09865270007528287,
+        0.11219417770305853,
+        -0.008727536368915484,
+        0.19162154139974588,
+        0.11987852982690834
+      ],
+      "depth": 3,
+      "description": "TD(\u03bb) trained, 300 games, lr=0.003"
+    },
+    {
+      "name": "Veteran (500g)",
+      "weights": [
+        1.147837483725096,
+        1.5962630643064355,
+        0.7086448386757684,
+        0.23591292564835328,
+        0.36506357655458377,
+        0.15111144309827212,
+        0.0711442352882867,
+        -0.08400223033869261,
+        0.22536136886177777,
+        0.16431725604124486
+      ],
+      "depth": 3,
+      "description": "TD(\u03bb) trained, 500 games, lr=0.003"
+    },
+    {
+      "name": "Aggressor",
+      "weights": [
+        2.0,
+        2.5,
+        0.1,
+        0.3,
+        0.5,
+        0.3,
+        0.1,
+        0.1,
+        0.05,
+        0.05
+      ],
+      "depth": 3,
+      "description": "Overvalues material, ignores defense"
+    },
+    {
+      "name": "Turtle",
+      "weights": [
+        0.8,
+        1.0,
+        1.5,
+        0.05,
+        0.1,
+        -0.1,
+        0.02,
+        0.02,
+        0.5,
+        0.8
+      ],
+      "depth": 3,
+      "description": "Defensive: back row + protection, avoids advancing"
+    }
+  ],
+  "matches": [
+    {
+      "player1": "Default",
+      "player2": "Random",
+      "p1_wins": 10,
+      "p2_wins": 0,
+      "draws": 10,
+      "games": 20
+    },
+    {
+      "player1": "Default",
+      "player2": "Rookie (100g)",
+      "p1_wins": 20,
+      "p2_wins": 0,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Default",
+      "player2": "Trained (300g)",
+      "p1_wins": 10,
+      "p2_wins": 10,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Default",
+      "player2": "Veteran (500g)",
+      "p1_wins": 20,
+      "p2_wins": 0,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Default",
+      "player2": "Aggressor",
+      "p1_wins": 10,
+      "p2_wins": 10,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Default",
+      "player2": "Turtle",
+      "p1_wins": 20,
+      "p2_wins": 0,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Random",
+      "player2": "Rookie (100g)",
+      "p1_wins": 0,
+      "p2_wins": 20,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Random",
+      "player2": "Trained (300g)",
+      "p1_wins": 0,
+      "p2_wins": 20,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Random",
+      "player2": "Veteran (500g)",
+      "p1_wins": 0,
+      "p2_wins": 20,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Random",
+      "player2": "Aggressor",
+      "p1_wins": 0,
+      "p2_wins": 20,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Random",
+      "player2": "Turtle",
+      "p1_wins": 0,
+      "p2_wins": 10,
+      "draws": 10,
+      "games": 20
+    },
+    {
+      "player1": "Rookie (100g)",
+      "player2": "Trained (300g)",
+      "p1_wins": 10,
+      "p2_wins": 0,
+      "draws": 10,
+      "games": 20
+    },
+    {
+      "player1": "Rookie (100g)",
+      "player2": "Veteran (500g)",
+      "p1_wins": 20,
+      "p2_wins": 0,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Rookie (100g)",
+      "player2": "Aggressor",
+      "p1_wins": 20,
+      "p2_wins": 0,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Rookie (100g)",
+      "player2": "Turtle",
+      "p1_wins": 20,
+      "p2_wins": 0,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Trained (300g)",
+      "player2": "Veteran (500g)",
+      "p1_wins": 10,
+      "p2_wins": 10,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Trained (300g)",
+      "player2": "Aggressor",
+      "p1_wins": 20,
+      "p2_wins": 0,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Trained (300g)",
+      "player2": "Turtle",
+      "p1_wins": 20,
+      "p2_wins": 0,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Veteran (500g)",
+      "player2": "Aggressor",
+      "p1_wins": 10,
+      "p2_wins": 10,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Veteran (500g)",
+      "player2": "Turtle",
+      "p1_wins": 20,
+      "p2_wins": 0,
+      "draws": 0,
+      "games": 20
+    },
+    {
+      "player1": "Aggressor",
+      "player2": "Turtle",
+      "p1_wins": 10,
+      "p2_wins": 0,
+      "draws": 10,
+      "games": 20
+    }
+  ],
+  "elo_ratings": {
+    "Default": 1590.2,
+    "Random": 1366.8,
+    "Rookie (100g)": 1604.3,
+    "Trained (300g)": 1564.4,
+    "Veteran (500g)": 1501.3,
+    "Aggressor": 1478.4,
+    "Turtle": 1394.7
+  },
+  "records": {
+    "Default": {
+      "wins": 90,
+      "losses": 20,
+      "draws": 10
+    },
+    "Random": {
+      "wins": 0,
+      "losses": 100,
+      "draws": 20
+    },
+    "Rookie (100g)": {
+      "wins": 90,
+      "losses": 20,
+      "draws": 10
+    },
+    "Trained (300g)": {
+      "wins": 80,
+      "losses": 30,
+      "draws": 10
+    },
+    "Veteran (500g)": {
+      "wins": 60,
+      "losses": 60,
+      "draws": 0
+    },
+    "Aggressor": {
+      "wins": 50,
+      "losses": 60,
+      "draws": 10
+    },
+    "Turtle": {
+      "wins": 10,
+      "losses": 90,
+      "draws": 20
+    }
+  },
+  "timestamp": "2026-02-24 04:40:29"
+}

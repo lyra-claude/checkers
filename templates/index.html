@@ -87,6 +87,30 @@
   }
   .weights-display { margin-top: 12px; font-size: 0.8em; color: #666; max-width: 520px; text-align: center; }
 
+  /* Arena leaderboard */
+  .arena-panel {
+    margin-top: 20px; width: 520px; max-width: 95vw;
+    background: #16213e; border-radius: 8px; padding: 16px;
+    display: none;
+  }
+  .arena-panel.visible { display: block; }
+  .arena-panel h2 { font-size: 1.1em; margin-bottom: 12px; color: #ffd700; }
+  .arena-table {
+    width: 100%; border-collapse: collapse; font-size: 0.85em;
+  }
+  .arena-table th {
+    text-align: left; padding: 6px 8px; border-bottom: 1px solid #334;
+    color: #888; font-weight: 500;
+  }
+  .arena-table td {
+    padding: 6px 8px; border-bottom: 1px solid #222;
+  }
+  .arena-table tr:first-child td { color: #ffd700; }
+  .arena-table .elo { font-weight: 600; }
+  .arena-table .win-pct { color: #2ecc71; }
+  .arena-meta { font-size: 0.75em; color: #555; margin-top: 8px; }
+  #btn-arena { background: #9b59b6; color: #fff; }
+
   .spinner {
     display: inline-block; width: 16px; height: 16px;
     border: 2px solid #ffd700; border-top-color: transparent;
@@ -120,12 +144,18 @@
 <div class="controls">
   <button id="btn-new" onclick="newGame()">New Game</button>
   <button id="btn-train" onclick="trainAI()">Train AI (500 games)</button>
+  <button id="btn-arena" onclick="toggleArena()">Arena</button>
 </div>
 
 <div class="info">
   Drag a piece or click-then-click. Captures are mandatory. Train to make the AI stronger!
 </div>
 <div class="weights-display" id="weights-info"></div>
+
+<div class="arena-panel" id="arena-panel">
+  <h2>Arena Leaderboard</h2>
+  <div id="arena-content">Loading...</div>
+</div>
 
 <script>
 const PC = { 1:'bm', 2:'bk', '-1':'wm', '-2':'wk' };
@@ -412,6 +442,43 @@ async function trainAI() {
     document.getElementById('weights-info').textContent = pairs.join(' | ');
   } catch (e) { setStatus('Error: ' + e.message); }
   document.getElementById('btn-train').disabled = false;
+}
+
+// ── Arena ──
+
+let arenaVisible = false;
+
+async function toggleArena() {
+  const panel = document.getElementById('arena-panel');
+  arenaVisible = !arenaVisible;
+  panel.classList.toggle('visible', arenaVisible);
+  if (arenaVisible) loadArena();
+}
+
+async function loadArena() {
+  const el = document.getElementById('arena-content');
+  try {
+    const r = await fetch('/api/arena/results');
+    if (!r.ok) {
+      el.innerHTML = '<p style="color:#888">No arena results yet.<br>Run <code>python arena.py</code> to generate them.</p>';
+      return;
+    }
+    const data = await r.json();
+    const ranked = Object.entries(data.elo_ratings).sort((a, b) => b[1] - a[1]);
+
+    let html = '<table class="arena-table"><tr><th>#</th><th>Player</th><th>Elo</th><th>W</th><th>L</th><th>D</th><th>Win%</th></tr>';
+    ranked.forEach(([name, elo], i) => {
+      const rec = data.records[name];
+      const total = rec.wins + rec.losses + rec.draws;
+      const pct = total > 0 ? ((rec.wins + 0.5 * rec.draws) / total * 100).toFixed(1) : '0.0';
+      html += `<tr><td>${i+1}</td><td>${name}</td><td class="elo">${Math.round(elo)}</td><td>${rec.wins}</td><td>${rec.losses}</td><td>${rec.draws}</td><td class="win-pct">${pct}%</td></tr>`;
+    });
+    html += '</table>';
+    html += `<div class="arena-meta">Tournament: ${data.timestamp}</div>`;
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = '<p style="color:#e74c3c">Error loading arena results.</p>';
+  }
 }
 
 // ── Init ──

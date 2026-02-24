@@ -6,7 +6,7 @@ Human plays black (moves first), AI plays white.
 import os
 from flask import Flask, jsonify, request, render_template
 from checkers import CheckersGame, SQ_TO_RC
-from ai import Evaluator, choose_move, train_td
+from ai import Evaluator, choose_move, train_td, FEATURE_NAMES
 
 app = Flask(__name__)
 
@@ -110,6 +110,18 @@ def api_train():
             [round(w, 4) for w in evaluator.weights]
         ))
     })
+
+
+@app.route("/api/arena/results")
+def api_arena_results():
+    """Return saved arena tournament results."""
+    results_path = os.path.join(os.path.dirname(__file__), "arena_results.json")
+    try:
+        with open(results_path) as f:
+            import json
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify({"error": "No arena results yet. Run: python arena.py"}), 404
 
 
 if __name__ == "__main__":
