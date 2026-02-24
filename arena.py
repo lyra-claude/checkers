@@ -283,6 +283,148 @@ def build_default_roster(quick=False):
     return players
 
 
+def training_curve(total_games=600, checkpoint_every=50, match_games=20, depth=3):
+    """Train incrementally and measure strength at each checkpoint.
+
+    Shows how win rate against the Default baseline changes over
+    training time. Reveals the point where additional training stops
+    helping (or starts hurting).
+    """
+    from ai import CheckersGame, extract_features, NUM_FEATURES, TRAIN_WIN
+
+    baseline = Player("Default", list(DEFAULT_WEIGHTS), depth=depth)
+    evaluator = Evaluator()
+    lr = 0.003
+    current_lr = lr
+
+    checkpoints = []
+    num_checkpoints = total_games // checkpoint_every
+
+    print(f"\n{'='*60}")
+    print(f"  TRAINING CURVE — {total_games} games, checkpoint every {checkpoint_every}")
+    print(f"  Measuring vs Default baseline ({match_games} games per checkpoint)")
+    print(f"{'='*60}\n")
+
+    phase1_end = int(total_games * 0.4)
+    opponent = None
+    stats = {"black_wins": 0, "white_wins": 0, "draws": 0}
+
+    for game_num in range(total_games):
+        # Phase transitions
+        if game_num == phase1_end:
+            opponent = Evaluator(evaluator.weights[:])
+        elif game_num > phase1_end and game_num % 50 == 0:
+            opponent = Evaluator(evaluator.weights[:])
+
+        game = CheckersGame()
+        positions = []
+        learner_color = 1 if game_num % 2 == 0 else -1
+
+        for _ in range(300):
+            over, result = game.is_game_over()
+            if over:
+                break
+
+            if game.turn == learner_color:
+                feats = extract_features(game)
+                positions.append(feats)
+                if random.random() < 0.1:
+                    moves = game.get_legal_moves()
+                    move = random.choice(moves)
+                else:
+                    move = choose_move(game, evaluator, depth=depth)
+            else:
+                if opponent is None:
+                    moves = game.get_legal_moves()
+                    move = random.choice(moves)
+                else:
+                    move = choose_move(game, opponent, depth=depth)
+
+            if move is None:
+                break
+            game.make_move(move)
+
+        over, result = game.is_game_over()
+        if result == learner_color:
+            terminal_value = TRAIN_WIN
+        elif result == -learner_color:
+            terminal_value = -TRAIN_WIN
+        else:
+            terminal_value = 0.0
+
+        if len(positions) >= 2:
+            values = []
+            for feats in positions:
+                v = learner_color * sum(w * f for w, f in zip(evaluator.weights, feats))
+                values.append(v)
+            values.append(terminal_value)
+
+            lam = 0.7
+            trace = [0.0] * NUM_FEATURES
+            for t in range(len(positions)):
+                feats = positions[t]
+                td_error = values[t + 1] - values[t]
+                td_error = max(-0.5, min(0.5, td_error))
+                for i in range(NUM_FEATURES):
+                    trace[i] = lam * trace[i] + learner_color * feats[i]
+                    evaluator.weights[i] += current_lr * td_error * trace[i]
+
+            for i in range(NUM_FEATURES):
+                evaluator.weights[i] = max(-10.0, min(10.0, evaluator.weights[i]))
+
+        current_lr *= 0.999
+
+        # Checkpoint?
+        if (game_num + 1) % checkpoint_every == 0:
+            cp_player = Player(
+                f"G{game_num+1}",
+                evaluator.weights[:],
+                depth=depth,
+            )
+            # Measure vs baseline
+            ev_cp = cp_player.evaluator()
+            ev_base = baseline.evaluator()
+            w, l, d = play_match(ev_cp, ev_base, num_games=match_games, depth=depth)
+            win_rate = (w + 0.5 * d) / match_games * 100
+
+            checkpoints.append({
+                "games": game_num + 1,
+                "wins": w,
+                "losses": l,
+                "draws": d,
+                "win_rate": win_rate,
+                "weights": evaluator.weights[:],
+            })
+
+            bar = "#" * int(win_rate / 2)
+            print(f"  Game {game_num+1:>4}: {win_rate:5.1f}% vs Default  "
+                  f"[{w}-{l}-{d}]  |{bar}")
+
+    # Summary
+    print(f"\n{'='*60}")
+    print(f"  TRAINING CURVE SUMMARY")
+    print(f"{'='*60}")
+
+    peak = max(checkpoints, key=lambda c: c["win_rate"])
+    print(f"  Peak performance: {peak['win_rate']:.1f}% at game {peak['games']}")
+
+    if checkpoints[-1]["win_rate"] < peak["win_rate"] - 5:
+        drop = peak["win_rate"] - checkpoints[-1]["win_rate"]
+        print(f"  Overfitting detected: -{drop:.1f}% from peak to final")
+    else:
+        print(f"  No significant overfitting detected")
+
+    # Save curve data
+    results_dir = os.path.dirname(os.path.abspath(__file__))
+    curve_path = os.path.join(results_dir, "training_curve.json")
+    with open(curve_path, "w") as f:
+        json.dump({"checkpoints": checkpoints, "total_games": total_games,
+                    "checkpoint_every": checkpoint_every}, f, indent=2)
+    print(f"\n  Curve data saved to {curve_path}")
+
+    return checkpoints
+
+
 if __name__ == "__main__":
     quick = "--quick" in sys.argv
 
@@ -290,6 +432,12 @@ if __name__ == "__main__":
         idx = sys.argv.index("--load")
         path = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else "arena_results.json"
         load_results(path)
+        sys.exit(0)
+
+    if "--curve" in sys.argv:
+        total = 300 if quick else 600
+        every = 25 if quick else 50
+        training_curve(total_games=total, checkpoint_every=every)
         sys.exit(0)
 
     games_per_side = 5 if quick else 10

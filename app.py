@@ -124,5 +124,17 @@ def api_arena_results():
         return jsonify({"error": "No arena results yet. Run: python arena.py"}), 404
 
 
+@app.route("/api/arena/curve")
+def api_arena_curve():
+    """Return saved training curve data."""
+    curve_path = os.path.join(os.path.dirname(__file__), "training_curve.json")
+    try:
+        with open(curve_path) as f:
+            import json
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify({"error": "No training curve yet. Run: python arena.py --curve"}), 404
+
+
 if __name__ == "__main__":
     app.run(port=5050, debug=True)

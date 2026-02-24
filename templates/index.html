@@ -111,6 +111,22 @@
   .arena-meta { font-size: 0.75em; color: #555; margin-top: 8px; }
   #btn-arena { background: #9b59b6; color: #fff; }
 
+  /* Training curve chart */
+  .curve-chart {
+    margin-top: 12px; padding: 8px 0;
+  }
+  .curve-row {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.78em; margin-bottom: 2px;
+  }
+  .curve-label { width: 50px; text-align: right; color: #888; flex-shrink: 0; }
+  .curve-bar-bg { flex: 1; height: 14px; background: #1a1a2e; border-radius: 2px; overflow: hidden; }
+  .curve-bar { height: 100%; border-radius: 2px; transition: width 0.3s; }
+  .curve-val { width: 42px; text-align: right; color: #aaa; flex-shrink: 0; }
+  .curve-peak .curve-bar { background: #ffd700; }
+  .curve-normal .curve-bar { background: #3498db; }
+  .curve-low .curve-bar { background: #e74c3c; }
+
   .spinner {
     display: inline-block; width: 16px; height: 16px;
     border: 2px solid #ffd700; border-top-color: transparent;
@@ -155,6 +171,10 @@
 <div class="arena-panel" id="arena-panel">
   <h2>Arena Leaderboard</h2>
   <div id="arena-content">Loading...</div>
+  <div id="curve-section" style="display:none; margin-top:16px;">
+    <h2>Training Curve</h2>
+    <div id="curve-content"></div>
+  </div>
 </div>
 
 <script>
@@ -461,24 +481,46 @@ async function loadArena() {
     const r = await fetch('/api/arena/results');
     if (!r.ok) {
       el.innerHTML = '<p style="color:#888">No arena results yet.<br>Run <code>python arena.py</code> to generate them.</p>';
-      return;
-    }
-    const data = await r.json();
-    const ranked = Object.entries(data.elo_ratings).sort((a, b) => b[1] - a[1]);
+    } else {
+      const data = await r.json();
+      const ranked = Object.entries(data.elo_ratings).sort((a, b) => b[1] - a[1]);
 
-    let html = '<table class="arena-table"><tr><th>#</th><th>Player</th><th>Elo</th><th>W</th><th>L</th><th>D</th><th>Win%</th></tr>';
-    ranked.forEach(([name, elo], i) => {
-      const rec = data.records[name];
-      const total = rec.wins + rec.losses + rec.draws;
-      const pct = total > 0 ? ((rec.wins + 0.5 * rec.draws) / total * 100).toFixed(1) : '0.0';
-      html += `<tr><td>${i+1}</td><td>${name}</td><td class="elo">${Math.round(elo)}</td><td>${rec.wins}</td><td>${rec.losses}</td><td>${rec.draws}</td><td class="win-pct">${pct}%</td></tr>`;
-    });
-    html += '</table>';
-    html += `<div class="arena-meta">Tournament: ${data.timestamp}</div>`;
-    el.innerHTML = html;
+      let html = '<table class="arena-table"><tr><th>#</th><th>Player</th><th>Elo</th><th>W</th><th>L</th><th>D</th><th>Win%</th></tr>';
+      ranked.forEach(([name, elo], i) => {
+        const rec = data.records[name];
+        const total = rec.wins + rec.losses + rec.draws;
+        const pct = total > 0 ? ((rec.wins + 0.5 * rec.draws) / total * 100).toFixed(1) : '0.0';
+        html += `<tr><td>${i+1}</td><td>${name}</td><td class="elo">${Math.round(elo)}</td><td>${rec.wins}</td><td>${rec.losses}</td><td>${rec.draws}</td><td class="win-pct">${pct}%</td></tr>`;
+      });
+      html += '</table>';
+      html += `<div class="arena-meta">Tournament: ${data.timestamp}</div>`;
+      el.innerHTML = html;
+    }
   } catch (e) {
     el.innerHTML = '<p style="color:#e74c3c">Error loading arena results.</p>';
   }
+
+  // Also try loading training curve
+  try {
+    const cr = await fetch('/api/arena/curve');
+    if (cr.ok) {
+      const curve = await cr.json();
+      const sec = document.getElementById('curve-section');
+      sec.style.display = 'block';
+      const cel = document.getElementById('curve-content');
+
+      const peak = Math.max(...curve.checkpoints.map(c => c.win_rate));
+      let html = '<div class="curve-chart">';
+      curve.checkpoints.forEach(cp => {
+        const cls = cp.win_rate >= peak ? 'curve-peak' : cp.win_rate >= 50 ? 'curve-normal' : 'curve-low';
+        const w = Math.max(2, cp.win_rate);
+        html += `<div class="curve-row ${cls}"><span class="curve-label">G${cp.games}</span><div class="curve-bar-bg"><div class="curve-bar" style="width:${w}%"></div></div><span class="curve-val">${cp.win_rate.toFixed(0)}%</span></div>`;
+      });
+      html += '</div>';
+      html += `<div class="arena-meta">Win rate vs Default at each training checkpoint. Gold = peak.</div>`;
+      cel.innerHTML = html;
+    }
+  } catch(e) { /* no curve data, that's fine */ }
 }
 
 // ── Init ──
